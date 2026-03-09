@@ -39,52 +39,9 @@ struct InvestigationAssetListView: View {
     }
 
     var body: some View {
-        List(assets.map(\.rowData)) { asset in
+        List(assets) { asset in
             InvestigationAssetRow(asset: asset)
         }
-    }
-}
-
-private struct InvestigationAssetRowData: Identifiable {
-    let id: UUID
-    let fileName: String
-    let creationDate: Date
-    let score: Double?
-}
-
-private struct InvestigationAssetRow: View {
-    let asset: InvestigationAssetRowData
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(asset.fileName)
-            Text(asset.creationDate.formatted(date: .abbreviated, time: .standard))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            if let score = asset.score {
-                Text(
-                    "Aesthetics: \(score, format: .number.precision(.fractionLength(2)))"
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            } else {
-                Text("No analysis")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-}
-
-private extension InvestigationPhotoAsset {
-    var rowData: InvestigationAssetRowData {
-        InvestigationAssetRowData(
-            id: id,
-            fileName: fileName,
-            creationDate: creationDate,
-            score: imageAnalysis?.overallAestheticsScore
-        )
     }
 }
 
