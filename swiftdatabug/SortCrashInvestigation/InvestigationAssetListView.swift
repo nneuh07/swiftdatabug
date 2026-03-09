@@ -1,4 +1,12 @@
 //
+//  InvestigationAssetListView.swift
+//  swiftdatabug
+//
+//  Created by Nils Neuhaus on 09.03.26.
+//
+
+
+//
 //  SortCrashInvestigationStage.swift
 //  swiftdatabug
 //
