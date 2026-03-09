@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 import SwiftUI
 
-private enum InvestigationSortBy: String, CaseIterable, Identifiable {
+enum InvestigationSortBy: String, CaseIterable, Identifiable {
     case date = "Date"
     case quality = "Quality"
 
@@ -31,41 +31,7 @@ private enum InvestigationSortBy: String, CaseIterable, Identifiable {
     }
 }
 
-struct SortCrashInvestigationView: View {
-    @Environment(\.modelContext) private var context
-    @State private var sortBy: InvestigationSortBy = .date
-
-    var body: some View {
-        NavigationStack {
-            InvestigationAssetListView(sortBy: sortBy)
-                .navigationTitle("Sort Crash Investigation")
-                .safeAreaInset(edge: .top) {
-                    InvestigationControls(sortBy: $sortBy)
-                }
-        }
-        .task {
-            insertInvestigationSampleData(into: context)
-        }
-    }
-}
-
-private struct InvestigationControls: View {
-    @Binding var sortBy: InvestigationSortBy
-
-    var body: some View {
-        Picker("Sort By", selection: $sortBy) {
-            ForEach(InvestigationSortBy.allCases) { sort in
-                Text(sort.rawValue).tag(sort)
-            }
-        }
-        .pickerStyle(.segmented)
-        .padding(.horizontal)
-        .padding(.vertical, 10)
-        .background(.bar)
-    }
-}
-
-private struct InvestigationAssetListView: View {
+struct InvestigationAssetListView: View {
     @Query private var assets: [InvestigationPhotoAsset]
 
     init(sortBy: InvestigationSortBy) {
@@ -120,28 +86,6 @@ private extension InvestigationPhotoAsset {
             score: imageAnalysis?.overallAestheticsScore
         )
     }
-}
-
-private func insertInvestigationSampleData(into context: ModelContext) {
-    let existing = try? context.fetch(FetchDescriptor<InvestigationPhotoAsset>())
-    guard existing?.isEmpty ?? true else { return }
-
-    for sample in InvestigationFixture.samples {
-        let analysis = sample.score.map {
-            InvestigationImageAnalysis(overallAestheticsScore: $0)
-        }
-        let asset = InvestigationPhotoAsset(
-            fileName: sample.fileName,
-            creationDate: InvestigationFixture.baseDate.addingTimeInterval(
-                sample.creationOffset
-            ),
-            imageAnalysis: analysis
-        )
-
-        context.insert(asset)
-    }
-
-    try? context.save()
 }
 
 // MARK: Comment out for crash on release
