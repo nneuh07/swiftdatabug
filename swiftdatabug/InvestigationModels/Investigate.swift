@@ -41,6 +41,7 @@ final class InvestigationImageAnalysis {
     }
 }
 
+
 enum InvestigationSortBy: String, CaseIterable, Identifiable {
     case date = "Date"
     case quality = "Quality"
