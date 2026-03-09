@@ -8,7 +8,6 @@
 import Foundation
 import SwiftData
 import SwiftUI
-import Vision
 
 enum SortCrashInvestigationConfig {
     static let resetStoreOnLaunch = true
@@ -59,11 +58,7 @@ enum SortCrashInvestigationDataStack {
         }
 
         let schema = Schema([
-            InvestigationCullingProject.self,
             InvestigationPhotoAsset.self,
-            InvestigationFileMetaData.self,
-            InvestigationBookmark.self,
-            InvestigationExifData.self,
             InvestigationImageAnalysis.self,
         ])
 
@@ -100,7 +95,7 @@ enum SortCrashInvestigationDataStack {
         )
 
         return rootDirectory
-            .appendingPathComponent("ReducedModels")
+            .appendingPathComponent("MinimalRepro")
             .appendingPathExtension("store")
     }
 
@@ -119,44 +114,31 @@ enum SortCrashInvestigationDataStack {
 }
 
 private enum InvestigationFixture {
-    static let projectName = "Test Project"
-    static let filteredCameraModel = "Canon R5"
-    static let filteredStatusRaw = 0
     static let baseDate = Date(timeIntervalSince1970: 1_700_000_000)
     static let samples: [InvestigationSample] = [
         InvestigationSample(
             fileName: "IMG_001.jpg",
             creationOffset: 0,
-            cameraModel: "Canon R5",
-            statusRaw: 0,
             score: 0.92
         ),
         InvestigationSample(
             fileName: "IMG_002.jpg",
             creationOffset: 1,
-            cameraModel: "Sony A7",
-            statusRaw: 0,
             score: 0.45
         ),
         InvestigationSample(
             fileName: "IMG_003.jpg",
             creationOffset: 2,
-            cameraModel: "Canon R5",
-            statusRaw: 0,
             score: 0.78
         ),
         InvestigationSample(
             fileName: "IMG_004.jpg",
             creationOffset: 3,
-            cameraModel: "Sony A7",
-            statusRaw: 0,
             score: nil
         ),
         InvestigationSample(
             fileName: "IMG_005.jpg",
             creationOffset: 4,
-            cameraModel: "Canon R5",
-            statusRaw: 1,
             score: 0.11
         ),
     ]
@@ -165,8 +147,6 @@ private enum InvestigationFixture {
 private struct InvestigationSample {
     let fileName: String
     let creationOffset: TimeInterval
-    let cameraModel: String
-    let statusRaw: Int
     let score: Double?
 }
 
@@ -175,18 +155,37 @@ private enum InvestigationSortBy: String, CaseIterable, Identifiable {
     case quality = "Quality"
 
     var id: Self { self }
+
+    var sortDescriptors: [SortDescriptor<InvestigationPhotoAsset>] {
+        switch self {
+        case .date:
+            return [SortDescriptor(\.creationDate, order: .reverse)]
+        case .quality:
+            return [
+                SortDescriptor(
+                    \.imageAnalysis?.overallAestheticsScore,
+                    order: .reverse
+                ),
+                SortDescriptor(\.creationDate, order: .reverse),
+            ]
+        }
+    }
 }
 
 private struct SortCrashInvestigationView: View {
+    @Environment(\.modelContext) private var context
     @State private var sortBy: InvestigationSortBy = .date
 
     var body: some View {
         NavigationStack {
-            InvestigationProjectGate(sortBy: sortBy)
+            InvestigationAssetListView(sortBy: sortBy)
                 .navigationTitle("Sort Crash Investigation")
                 .safeAreaInset(edge: .top) {
                     InvestigationControls(sortBy: $sortBy)
                 }
+        }
+        .task {
+            insertInvestigationSampleData(into: context)
         }
     }
 }
@@ -207,40 +206,11 @@ private struct InvestigationControls: View {
     }
 }
 
-private struct InvestigationProjectGate: View {
-    @Query private var projects: [InvestigationCullingProject]
-    @Environment(\.modelContext) private var context
-
-    let sortBy: InvestigationSortBy
-
-    var body: some View {
-        Group {
-            if let project = projects.first {
-                InvestigationAssetListView(
-                    request: InvestigationPhotoAssetRequest(
-                        projectId: project.id,
-                        sortBy: sortBy
-                    )
-                )
-            } else {
-                ProgressView("Setting up reduced-model sample data...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-        .task {
-            insertInvestigationSampleData(into: context)
-        }
-    }
-}
-
 private struct InvestigationAssetListView: View {
     @Query private var assets: [InvestigationPhotoAsset]
 
-    init(request: InvestigationPhotoAssetRequest) {
-        _assets = Query(
-            filter: request.filterPredicate(),
-            sort: request.sortDescriptors()
-        )
+    init(sortBy: InvestigationSortBy) {
+        _assets = Query(sort: sortBy.sortDescriptors)
     }
 
     var body: some View {
@@ -253,7 +223,7 @@ private struct InvestigationAssetListView: View {
 private struct InvestigationAssetRowData: Identifiable {
     let id: UUID
     let fileName: String
-    let cameraModel: String?
+    let creationDate: Date
     let score: Double?
 }
 
@@ -263,7 +233,7 @@ private struct InvestigationAssetRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(asset.fileName)
-            Text(asset.cameraModel ?? "No camera")
+            Text(asset.creationDate.formatted(date: .abbreviated, time: .standard))
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -282,67 +252,20 @@ private struct InvestigationAssetRow: View {
     }
 }
 
-private struct InvestigationPhotoAssetRequest {
-    let projectId: UUID
-    let sortBy: InvestigationSortBy
-
-    func filterPredicate() -> Predicate<InvestigationPhotoAsset> {
-        let basePredicate = #Predicate<InvestigationPhotoAsset> { asset in
-            asset.cullingProject?.id == projectId
-        }
-
-        let statusValues = [InvestigationFixture.filteredStatusRaw]
-        let statusPredicate = #Predicate<InvestigationPhotoAsset> { asset in
-            statusValues.contains(asset.statusRaw)
-        }
-
-        let cameraValues = [InvestigationFixture.filteredCameraModel]
-        let cameraPredicate = #Predicate<InvestigationPhotoAsset> { asset in
-            asset.exifData?.cameraModel.flatMap { cameraModel in
-                cameraValues.contains(cameraModel) ? true : nil
-            } ?? false
-        }
-
-        return #Predicate<InvestigationPhotoAsset> { asset in
-            basePredicate.evaluate(asset)
-                && statusPredicate.evaluate(asset)
-                && cameraPredicate.evaluate(asset)
-        }
-    }
-
-    func sortDescriptors() -> [SortDescriptor<InvestigationPhotoAsset>] {
-        switch sortBy {
-        case .date:
-            return [SortDescriptor(\.creationDate, order: .reverse)]
-        case .quality:
-            return [
-                SortDescriptor(
-                    \.imageAnalysis?.overallAestheticsScore,
-                    order: .reverse
-                ),
-                SortDescriptor(\.creationDate, order: .reverse),
-            ]
-        }
-    }
-}
-
 private extension InvestigationPhotoAsset {
     var rowData: InvestigationAssetRowData {
         InvestigationAssetRowData(
             id: id,
-            fileName: metadata.fileName,
-            cameraModel: exifData?.cameraModel,
+            fileName: fileName,
+            creationDate: creationDate,
             score: imageAnalysis?.overallAestheticsScore
         )
     }
 }
 
 private func insertInvestigationSampleData(into context: ModelContext) {
-    let existing = try? context.fetch(FetchDescriptor<InvestigationCullingProject>())
+    let existing = try? context.fetch(FetchDescriptor<InvestigationPhotoAsset>())
     guard existing?.isEmpty ?? true else { return }
-
-    let project = InvestigationCullingProject(name: InvestigationFixture.projectName)
-    context.insert(project)
 
     for sample in InvestigationFixture.samples {
         let analysis = sample.score.map {
@@ -350,17 +273,11 @@ private func insertInvestigationSampleData(into context: ModelContext) {
         }
         let asset = InvestigationPhotoAsset(
             fileName: sample.fileName,
-            cullingProject: project,
+            creationDate: InvestigationFixture.baseDate.addingTimeInterval(
+                sample.creationOffset
+            ),
             imageAnalysis: analysis
         )
-
-        asset.creationDate = InvestigationFixture.baseDate.addingTimeInterval(
-            sample.creationOffset
-        )
-        asset.modifiedDate = asset.creationDate
-        asset.statusRaw = sample.statusRaw
-        asset.exifData = InvestigationExifData(cameraModel: sample.cameraModel)
-        analysis?.photoAsset = asset
 
         context.insert(asset)
     }
@@ -368,101 +285,34 @@ private func insertInvestigationSampleData(into context: ModelContext) {
     try? context.save()
 }
 
-@Model
-final class InvestigationBookmark {
-    @Attribute var url: URL
-    @Attribute var bookmark: Data
-
-    init(url: URL, bookmark: Data = Data()) {
-        self.url = url
-        self.bookmark = bookmark
-    }
-}
+// MARK: Comment out for crash on release
 
 @Model
-final class InvestigationFileMetaData {
-    @Relationship(deleteRule: .cascade) var fileBookmark: InvestigationBookmark
-    @Relationship(deleteRule: .cascade) var directoryBookmark: InvestigationBookmark
+final class InvestigationPhotoAsset {
+    @Attribute(.unique) var id: UUID
     @Attribute var fileName: String
-    @Attribute var fileExtension: String
-    @Attribute var baseName: String
-    @Attribute var fileSize: Int64
+    @Attribute var creationDate: Date
+    @Relationship(deleteRule: .cascade)
+    var imageAnalysis: InvestigationImageAnalysis?
 
-    init(fileName: String, fileExtension: String) {
-        let dummyURL = URL(fileURLWithPath: "/tmp/\(fileName)")
-        self.fileBookmark = InvestigationBookmark(url: dummyURL)
-        self.directoryBookmark = InvestigationBookmark(
-            url: URL(fileURLWithPath: "/tmp")
-        )
+    init(
+        id: UUID = UUID(),
+        fileName: String,
+        creationDate: Date,
+        imageAnalysis: InvestigationImageAnalysis? = nil
+    ) {
+        self.id = id
         self.fileName = fileName
-        self.fileExtension = fileExtension
-        self.baseName = fileName
-        self.fileSize = 0
-    }
-}
-
-@Model
-final class InvestigationExifData {
-    @Attribute var cameraModel: String?
-
-    init(cameraModel: String? = nil) {
-        self.cameraModel = cameraModel
+        self.creationDate = creationDate
+        self.imageAnalysis = imageAnalysis
     }
 }
 
 @Model
 final class InvestigationImageAnalysis {
     @Attribute var overallAestheticsScore: Double
-    @Attribute var isUtility: Bool
-    @Attribute var featurePrints: [FeaturePrintObservation]?
 
-    var photoAsset: InvestigationPhotoAsset?
-
-    init(
-        overallAestheticsScore: Double,
-        isUtility: Bool = false,
-        featurePrint: FeaturePrintObservation? = nil
-    ) {
+    init(overallAestheticsScore: Double) {
         self.overallAestheticsScore = overallAestheticsScore
-        self.isUtility = isUtility
-        self.featurePrints = featurePrint.map { [$0] } ?? []
-    }
-}
-
-@Model
-final class InvestigationCullingProject {
-    @Attribute(.unique) var id: UUID = UUID()
-    @Attribute var name: String
-
-    init(name: String) {
-        self.name = name
-    }
-}
-
-@Model
-final class InvestigationPhotoAsset {
-    @Attribute(.unique) var id: UUID = UUID()
-    @Relationship(deleteRule: .cascade) var metadata: InvestigationFileMetaData
-    @Attribute var creationDate: Date = Date()
-    @Attribute var modifiedDate: Date = Date()
-    @Attribute var starRating: Int = 0
-    @Attribute var statusRaw: Int = 0
-
-    @Relationship(deleteRule: .cascade) var exifData: InvestigationExifData?
-    @Relationship(deleteRule: .cascade)
-    var imageAnalysis: InvestigationImageAnalysis?
-    var cullingProject: InvestigationCullingProject?
-
-    init(
-        fileName: String,
-        cullingProject: InvestigationCullingProject,
-        imageAnalysis: InvestigationImageAnalysis? = nil
-    ) {
-        self.metadata = InvestigationFileMetaData(
-            fileName: fileName,
-            fileExtension: "jpg"
-        )
-        self.cullingProject = cullingProject
-        self.imageAnalysis = imageAnalysis
     }
 }
