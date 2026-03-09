@@ -10,7 +10,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class FileMetaData: Identifiable, Hashable {
+final class FileMetaData: Identifiable {
     @Relationship(deleteRule: .cascade) var fileBookmark: Bookmark
     @Relationship(deleteRule: .cascade) var directoryBookmark: Bookmark
     @Attribute var fileName: String
@@ -54,29 +54,5 @@ final class FileMetaData: Identifiable, Hashable {
 
     var isInRejectedFolder: Bool {
         fileBookmark.url.path.contains("/_Rejected/")
-    }
-    
-    static func == (lhs: FileMetaData, rhs: FileMetaData) -> Bool {
-        lhs.fileBookmark == rhs.fileBookmark &&
-        lhs.fileName == rhs.fileName &&
-        lhs.fileExtension == rhs.fileExtension &&
-        lhs.baseName == rhs.baseName &&
-        lhs.fileSize == rhs.fileSize &&
-        lhs.directoryBookmark == rhs.directoryBookmark &&
-        lhs.sidecarBookmark == rhs.sidecarBookmark &&
-        lhs.sidecarFileName == rhs.sidecarFileName &&
-        lhs.sidecarFileExtension == rhs.sidecarFileExtension
-    }
-
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(fileBookmark)
-        hasher.combine(fileName)
-        hasher.combine(fileExtension)
-        hasher.combine(baseName)
-        hasher.combine(fileSize)
-        hasher.combine(directoryBookmark)
-        hasher.combine(sidecarBookmark)
-        hasher.combine(sidecarFileName)
-        hasher.combine(sidecarFileExtension)
     }
 }

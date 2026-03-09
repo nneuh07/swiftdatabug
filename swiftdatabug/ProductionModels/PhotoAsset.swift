@@ -24,7 +24,7 @@ extension Image.Orientation {
 }
 
 @Model
-final class PhotoAsset: Identifiable, Hashable {
+final class PhotoAsset: Identifiable {
     @Attribute(.unique) var id: UUID
     @Relationship(deleteRule: .cascade) var metadata: FileMetaData
     @Attribute var creationDate: Date
@@ -90,14 +90,6 @@ final class PhotoAsset: Identifiable, Hashable {
         self.cullingProject = cullingProject
     }
 
-    static func == (lhs: PhotoAsset, rhs: PhotoAsset) -> Bool {
-        return lhs.id == rhs.id
-    }
-
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
-    
     func updateCullingStatus(_ newStatus: CullingStatus) {
         self.status = newStatus
         // Note: GalleryElement removed - status is now managed directly on PhotoAsset

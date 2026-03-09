@@ -8,8 +8,7 @@
 import Foundation
 import SwiftData
 
-protocol AnyBookmark: Identifiable, Hashable {
-    var id: String { get }
+protocol AnyBookmark {
     var url: URL { get }
     var bookmark: Data { get }
 }
@@ -18,20 +17,10 @@ protocol AnyBookmark: Identifiable, Hashable {
 final class Bookmark: AnyBookmark {
     @Attribute var url: URL
     @Attribute var bookmark: Data
-    var id: String { url.relativePath }
     
     init(url: URL, bookmark: Data = Data()) {
         self.url = url
         self.bookmark = bookmark
-    }
-
-    static func == (lhs: Bookmark, rhs: Bookmark) -> Bool {
-        lhs.url == rhs.url && lhs.bookmark == rhs.bookmark
-    }
-    
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(url)
-        hasher.combine(bookmark)
     }
 }
 

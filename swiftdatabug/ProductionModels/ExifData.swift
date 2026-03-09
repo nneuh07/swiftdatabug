@@ -8,7 +8,7 @@
 import SwiftData
 
 @Model
-final class ExifData: Codable, Hashable {
+final class ExifData: Codable {
     @Attribute var cameraModel: String?
 
     // Temporary investigation stubs to keep the wider app compiling while
