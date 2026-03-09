@@ -1,0 +1,8 @@
+[mcp_servers.XcodeBuildMCP]
+command = "npx"
+args = ["-y", "xcodebuildmcp@latest", "mcp"]
+env = { "INCREMENTAL_BUILDS_ENABLED" = "true", "XCODEBUILDMCP_SENTRY_DISABLED" = "false" }
+
+[mcp_servers.AppleDocs]
+command = "npx"
+args = ["-y", "@kimsungwhee/apple-docs-mcp@latest"]
